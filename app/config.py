@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     app_key: str = "dev-app-key"
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    # Tidings tables are `public.tidings_*` so they can share a Supabase project with other apps.
+    supabase_schema: str = "public"
+    supabase_table_prefix: str = "tidings_"
     storage_backend: str = ""  # "memory" | "supabase"; empty → auto
     public_base_url: str = "http://localhost:8000"
     invite_ttl_days: int = 14

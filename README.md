@@ -37,6 +37,10 @@ Numbered SQL files live in `migrations/`. Apply them in order:
 1. Supabase Dashboard → **SQL Editor** → New query.
 2. Paste `migrations/001_init.sql`, run. Then `002_indexes.sql`, then `003_grants.sql`, and any later files in number order.
 
+All Tidings tables are named `tidings_*` (in `public`, which the Data API already exposes), so the
+project can be shared with another app. The migrations only create, index and grant those 17 tables —
+no schema-wide grants, no default-privilege changes, nothing dropped. No dashboard settings needed.
+
 Every table has RLS enabled with **no policies**: the anon key can read nothing, and only the
 service-role key used by this API can. Authorization rules (owner / co-shopper / surprise redaction /
 hidden claims) are enforced in the API (`app/routers/sync.py`, `app/redaction.py`, `app/claims.py`).

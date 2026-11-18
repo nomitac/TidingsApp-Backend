@@ -4,10 +4,11 @@
 -- Foreign keys between synced tables are intentionally omitted: offline-first clients can
 -- push children before parents from another device; the API enforces ownership instead.
 
-create extension if not exists pgcrypto;
+-- Shared-project safe: every Tidings table is named `tidings_*`, so it can live in the same Supabase
+-- project (and `public` schema) as another app without clashing. Nothing else is created or changed.
 
 -- ---------------------------------------------------------------- users
-create table if not exists users (
+create table if not exists tidings_users (
   id                uuid primary key,
   display_name      text not null default '',
   default_currency  char(3) not null default 'USD',
@@ -20,7 +21,7 @@ create table if not exists users (
 );
 
 -- ---------------------------------------------------------------- occasion years
-create table if not exists occasion_years (
+create table if not exists tidings_occasion_years (
   id                 uuid primary key,
   owner_id           uuid not null,
   name               text not null default '',
@@ -36,7 +37,7 @@ create table if not exists occasion_years (
   server_updated_at  timestamptz not null default now()
 );
 
-create table if not exists year_members (
+create table if not exists tidings_year_members (
   id                uuid primary key,
   occasion_year_id  uuid not null,
   user_id           uuid,
@@ -50,7 +51,7 @@ create table if not exists year_members (
   server_updated_at timestamptz not null default now()
 );
 
-create table if not exists groups (
+create table if not exists tidings_groups (
   id                uuid primary key,
   occasion_year_id  uuid not null,
   name              text not null default '',
@@ -61,7 +62,7 @@ create table if not exists groups (
   server_updated_at timestamptz not null default now()
 );
 
-create table if not exists recipients (
+create table if not exists tidings_recipients (
   id                    uuid primary key,
   person_id             uuid not null,
   occasion_year_id      uuid not null,
@@ -83,7 +84,7 @@ create table if not exists recipients (
   server_updated_at     timestamptz not null default now()
 );
 
-create table if not exists gifts (
+create table if not exists tidings_gifts (
   id                      uuid primary key,
   occasion_year_id        uuid not null,
   recipient_id            uuid not null,
@@ -119,7 +120,7 @@ create table if not exists gifts (
 );
 
 -- Append-only price log (F12, v1.1 price tracking).
-create table if not exists price_history (
+create table if not exists tidings_price_history (
   id          uuid primary key default gen_random_uuid(),
   gift_id     uuid not null,
   price_cents bigint not null,
@@ -129,7 +130,7 @@ create table if not exists price_history (
 );
 
 -- ---------------------------------------------------------------- wishlists & claims
-create table if not exists wishlists (
+create table if not exists tidings_wishlists (
   id                     uuid primary key,
   owner_user_id          uuid not null,
   owner_name             text not null default '',
@@ -145,7 +146,7 @@ create table if not exists wishlists (
   server_updated_at      timestamptz not null default now()
 );
 
-create table if not exists wishlist_items (
+create table if not exists tidings_wishlist_items (
   id                uuid primary key,
   wishlist_id       uuid not null,
   title             text not null default '',
@@ -164,7 +165,7 @@ create table if not exists wishlist_items (
 );
 
 -- Claims are NEVER returned to the wishlist owner (enforced in the API).
-create table if not exists claims (
+create table if not exists tidings_claims (
   id                uuid primary key,
   wishlist_item_id  uuid not null,
   claimer_user_id   uuid,
@@ -179,7 +180,7 @@ create table if not exists claims (
 );
 
 -- ---------------------------------------------------------------- secret santa
-create table if not exists secret_santa_exchanges (
+create table if not exists tidings_secret_santa_exchanges (
   id                        uuid primary key,
   occasion_year_id          uuid not null,
   name                      text not null default '',
@@ -199,7 +200,7 @@ create table if not exists secret_santa_exchanges (
 );
 
 -- ---------------------------------------------------------------- activity, invites
-create table if not exists activity_log (
+create table if not exists tidings_activity_log (
   id                   uuid primary key,
   occasion_year_id     uuid not null,
   actor_user_id        uuid not null,
@@ -216,7 +217,7 @@ create table if not exists activity_log (
   server_updated_at    timestamptz not null default now()
 );
 
-create table if not exists invites (
+create table if not exists tidings_invites (
   id                uuid primary key,
   code              text not null unique,
   occasion_year_id  uuid not null,
@@ -230,7 +231,7 @@ create table if not exists invites (
 );
 
 -- ---------------------------------------------------------------- push, subscriptions
-create table if not exists push_tokens (
+create table if not exists tidings_push_tokens (
   id                uuid primary key,
   user_id           uuid not null,
   token             text not null unique,
@@ -242,7 +243,7 @@ create table if not exists push_tokens (
   server_updated_at timestamptz not null default now()
 );
 
-create table if not exists subscriptions (
+create table if not exists tidings_subscriptions (
   id                      uuid primary key,
   user_id                 uuid not null,
   product_id              text not null,
@@ -255,7 +256,7 @@ create table if not exists subscriptions (
 );
 
 -- ---------------------------------------------------------------- telemetry (own tables, no 3rd-party SDK)
-create table if not exists analytics_events (
+create table if not exists tidings_analytics_events (
   id          uuid primary key,
   user_id     uuid,
   name        text not null,
@@ -264,7 +265,7 @@ create table if not exists analytics_events (
   received_at timestamptz not null default now()
 );
 
-create table if not exists error_logs (
+create table if not exists tidings_error_logs (
   id          uuid primary key,
   user_id     uuid,
   message     text not null,
@@ -275,20 +276,20 @@ create table if not exists error_logs (
 );
 
 -- ---------------------------------------------------------------- RLS: on, no policies
-alter table users                  enable row level security;
-alter table occasion_years         enable row level security;
-alter table year_members           enable row level security;
-alter table groups                 enable row level security;
-alter table recipients             enable row level security;
-alter table gifts                  enable row level security;
-alter table price_history          enable row level security;
-alter table wishlists              enable row level security;
-alter table wishlist_items         enable row level security;
-alter table claims                 enable row level security;
-alter table secret_santa_exchanges enable row level security;
-alter table activity_log           enable row level security;
-alter table invites                enable row level security;
-alter table push_tokens            enable row level security;
-alter table subscriptions          enable row level security;
-alter table analytics_events       enable row level security;
-alter table error_logs             enable row level security;
+alter table tidings_users          enable row level security;
+alter table tidings_occasion_years enable row level security;
+alter table tidings_year_members   enable row level security;
+alter table tidings_groups         enable row level security;
+alter table tidings_recipients     enable row level security;
+alter table tidings_gifts          enable row level security;
+alter table tidings_price_history  enable row level security;
+alter table tidings_wishlists      enable row level security;
+alter table tidings_wishlist_items enable row level security;
+alter table tidings_claims         enable row level security;
+alter table tidings_secret_santa_exchanges enable row level security;
+alter table tidings_activity_log   enable row level security;
+alter table tidings_invites        enable row level security;
+alter table tidings_push_tokens    enable row level security;
+alter table tidings_subscriptions  enable row level security;
+alter table tidings_analytics_events enable row level security;
+alter table tidings_error_logs     enable row level security;

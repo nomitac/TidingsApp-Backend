@@ -80,17 +80,27 @@ class SupabaseRepo:
     """PostgREST client. Uses the service-role key, which bypasses RLS — RLS is enabled on
     every table with no policies, so the anon key can read nothing."""
 
-    def __init__(self, url: str, service_key: str, client: httpx.Client | None = None) -> None:
+    def __init__(self, url: str, service_key: str, client: httpx.Client | None = None,
+                 schema: str = "public", table_prefix: str = "tidings_") -> None:
+        self._prefix = table_prefix
+        self._client = client or httpx.Client(
+            base_url=url.rstrip("/") + "/rest/v1",
+            headers=self.build_headers(service_key, schema),
+            timeout=10.0,
+        )
+
+    @staticmethod
+    def build_headers(service_key: str, schema: str = "public") -> dict[str, str]:
         headers = {"apikey": service_key, "Content-Type": "application/json"}
         # Legacy service_role keys are JWTs and go in Authorization too. New-style secret keys
         # (sb_secret_…) are not JWTs and must only be sent as `apikey`.
         if service_key.startswith("eyJ"):
             headers["Authorization"] = f"Bearer {service_key}"
-        self._client = client or httpx.Client(
-            base_url=url.rstrip("/") + "/rest/v1",
-            headers=headers,
-            timeout=10.0,
-        )
+        # PostgREST schema selection: reads use Accept-Profile, writes use Content-Profile.
+        if schema and schema != "public":
+            headers["Accept-Profile"] = schema
+            headers["Content-Profile"] = schema
+        return headers
 
     @staticmethod
     def _out(row: Row) -> Row:
@@ -105,6 +115,10 @@ class SupabaseRepo:
         if any(c in s for c in ',.:()"'):
             return '"' + s.replace('"', '\\"') + '"'
         return s
+
+    def _path(self, table: str) -> str:
+        """API table name → Postgres table, e.g. "gifts" → "/tidings_gifts"."""
+        return f"/{self._prefix}{table}"
 
     def get(self, table: str, id: str) -> Row | None:
         rows = self.select(table, eq={"id": id})
@@ -121,13 +135,13 @@ class SupabaseRepo:
             params.append((k, "in.(" + ",".join(self._lit(v) for v in vs) + ")"))
         for k, v in (gt or {}).items():
             params.append((k, f"gt.{v}"))
-        r = self._client.get(f"/{table}", params=params)
+        r = self._client.get(self._path(table), params=params)
         r.raise_for_status()
         return [self._out(x) for x in r.json()]
 
     def upsert(self, table: str, row: Row) -> Row:
         r = self._client.post(
-            f"/{table}",
+            self._path(table),
             params={"on_conflict": "id"},
             json=row,
             headers={"Prefer": "resolution=merge-duplicates,return=representation"},
@@ -139,6 +153,6 @@ class SupabaseRepo:
     def insert_many(self, table: str, rows: list[Row]) -> int:
         if not rows:
             return 0
-        r = self._client.post(f"/{table}", json=rows, headers={"Prefer": "return=minimal"})
+        r = self._client.post(self._path(table), json=rows, headers={"Prefer": "return=minimal"})
         r.raise_for_status()
         return len(rows)

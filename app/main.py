@@ -13,7 +13,7 @@ def build_repo(settings: Settings) -> Repository:
     if settings.resolved_backend == "supabase":
         if not (settings.supabase_url and settings.supabase_service_role_key):
             raise RuntimeError("STORAGE_BACKEND=supabase needs SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
-        return SupabaseRepo(settings.supabase_url, settings.supabase_service_role_key)
+        return SupabaseRepo(settings.supabase_url, settings.supabase_service_role_key, schema=settings.supabase_schema, table_prefix=settings.supabase_table_prefix)
     return MemoryRepo()
 
 
